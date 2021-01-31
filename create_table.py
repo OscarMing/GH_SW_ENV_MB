@@ -76,12 +76,6 @@ class connection_info():
     def drop_db(self):
         self.Base.metadata.drop_all(self.engine)  
     
-#def init_db():
-#    Base.metadata.create_all(engine)
-
-#def drop_db():
-#    Base.metadata.drop_all(engine)
-
 if __name__ == '__main__':
 
     ci = connection_info('UserName','UserPWD','DBIP','PORT','Database Schema',Base)
@@ -89,8 +83,8 @@ if __name__ == '__main__':
     print(eg)
     ci.init_db()
     
-    #if not eg.dialect.has_table(eg, 'thdata'):
-    #    ci.init_db()
-    #else:
-    #    ci.drop_db()
+    if not eg.dialect.has_table(eg, 'thdata'):
+       ci.init_db()
+    else:
+       ci.drop_db()
     
