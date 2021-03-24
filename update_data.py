@@ -304,9 +304,11 @@ async def Get_Device_Data_Soil(**kwargs):
                     
                     device_status_soil[f'sdev{i}']['status']=22
                     device_status_soil[f'sdev{i}']['description']=str(f'sdev{i} Data Error')
-                    Save_Err_Log(f'sdev{ij}',22)
+                    Save_Err_Log(f'sdev{i}',22)
         
                     temp_data.append([0, 0, 0, 0])
+
+                time.sleep(2)
 
         
         writer.close()
