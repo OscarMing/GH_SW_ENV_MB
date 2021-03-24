@@ -24,6 +24,8 @@ from metpy.units import units
 ### 2 = Database Connection Error
 ### 3 = Database Error
 ### 11 = Device Connection Error
+### 12 = Device Data Error
+### 21 = Sensor Node Error
 ### 22 = Sensor Node Error
 status = 0
 DN = 4
@@ -152,7 +154,7 @@ async def Get_Device_Data(dev_num, host):
         writer.write(device_WritingStr)
         await writer.drain()
 
-        async with timeout(5) as cm:
+        async with timeout(10) as cm:
             try:
                 data = await reader.read(1024)
             except Exception as e:
@@ -169,24 +171,36 @@ async def Get_Device_Data(dev_num, host):
         else:
 
             ret = bytearray(data)
+
+            if len(ret)>=9:
                     
-            TP_value = int.from_bytes(bytes([ret[5]]) + bytes([ret[6]]), 'big')
-            TP_value = float(TP_value / 10)
+                TP_value = int.from_bytes(bytes([ret[5]]) + bytes([ret[6]]), 'big')
+                TP_value = float(TP_value / 10)
 
-            HD_value = int.from_bytes(bytes([ret[3]]) + bytes([ret[4]]), 'big')
-            HD_value = float(HD_value / 10)
+                HD_value = int.from_bytes(bytes([ret[3]]) + bytes([ret[4]]), 'big')
+                HD_value = float(HD_value / 10)
 
-            await Put_Data(dev_num, TP_value, HD_value)
-                        
-            # print('Now Temperature=',str(TP_value),'°C')
-            # print('Now Humidity',str(HD_value),'%')
+                await Put_Data(dev_num, TP_value, HD_value)
+                            
+                # print('Now Temperature=',str(TP_value),'°C')
+                # print('Now Humidity',str(HD_value),'%')
 
-            writer.close()
-            await writer.wait_closed()
-            device_status[dev_num]['status']=1
-            device_status[dev_num]['description']=str('Connection Success !!')
+                # writer.close()
+                # await writer.wait_closed()
+                device_status[dev_num]['status']=1
+                device_status[dev_num]['description']=str('Connection Success !!')
+                
+                Query_Data_Flag[int(dev_id)-1] = 1
             
-            Query_Data_Flag[int(dev_id)-1] = 1
+            else:
+                device_status[dev_num]['status'] = 12
+                device_status[dev_num]['description']=str('Data Error')
+                Save_Err_Log(dev_num,12)
+                await Put_Zero(dev_num)
+                Query_Data_Flag[int(dev_id)-1] = 1
+        
+        writer.close()
+        await writer.wait_closed()
 
     except OSError as err: 
         device_status[dev_num]['status'] = 11
@@ -194,6 +208,8 @@ async def Get_Device_Data(dev_num, host):
         Save_Err_Log(dev_num,11)
         await Put_Zero(dev_num)
         Query_Data_Flag[int(dev_id)-1] = 1
+        writer.close()
+        await writer.wait_closed()
 
 async def Put_Zero(dev_id):
     global device_data, device_data_raw
@@ -264,25 +280,33 @@ async def Get_Device_Data_Soil(**kwargs):
                 await writer.wait_closed()
             else:
 
-                ret = bytearray(data)
-                        
-                ST_value = int.from_bytes(bytes([ret[7]]) + bytes([ret[8]]), 'big')
-                ST_value = float(ST_value / 10)
+                rets = bytearray(data)
 
-                SH_value = int.from_bytes(bytes([ret[9]]) + bytes([ret[10]]), 'big')
-                SH_value = float(SH_value / 10)
+                if len(rets)>=21:        
+                    ST_value = int.from_bytes(bytes([rets[7]]) + bytes([rets[8]]), 'big')
+                    ST_value = float(ST_value / 10)
 
-                SP_value = int.from_bytes(bytes([ret[15]]) + bytes([ret[16]]), 'big')
-                SP_value = float(SP_value / 10)
+                    SH_value = int.from_bytes(bytes([rets[9]]) + bytes([rets[10]]), 'big')
+                    SH_value = float(SH_value / 10)
 
-                SE_value = int.from_bytes(bytes([ret[17]]) + bytes([ret[18]]), 'big')
-                SE_value = float(SE_value / 10)
+                    SP_value = int.from_bytes(bytes([rets[15]]) + bytes([rets[16]]), 'big')
+                    SP_value = float(SP_value / 10)
 
-                temp_data.append([ST_value, SH_value, SP_value, SE_value])
+                    SE_value = int.from_bytes(bytes([rets[17]]) + bytes([rets[18]]), 'big')
+                    SE_value = float(SE_value / 10)
 
-                device_status_soil[f'sdev{i+1}']['status']=1
-                device_status_soil[f'sdev{i+1}']['description']=str('Connection Success !!')
+                    temp_data.append([ST_value, SH_value, SP_value, SE_value])
+
+                    device_status_soil[f'sdev{i+1}']['status']=1
+                    device_status_soil[f'sdev{i+1}']['description']=str('Connection Success !!')
                 
+                else:
+                    
+                    device_status_soil[f'sdev{i}']['status']=22
+                    device_status_soil[f'sdev{i}']['description']=str(f'sdev{i} Data Error')
+                    Save_Err_Log(f'sdev{ij}',22)
+        
+                    temp_data.append([0, 0, 0, 0])
 
         
         writer.close()
@@ -300,9 +324,9 @@ async def Get_Device_Data_Soil(**kwargs):
         
     except OSError as err: 
         for j in range(1,3):
-            device_status_soil[f'sdev{j}']['status']=22
+            device_status_soil[f'sdev{j}']['status']=21
             device_status_soil[f'sdev{j}']['description']=str(err)
-            Save_Err_Log(f'sdev{j}',22)
+            Save_Err_Log(f'sdev{j}',21)
         
         temp_data.append([0, 0, 0, 0])
 
